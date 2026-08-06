@@ -7,7 +7,7 @@ ecosystem: svm
 chains:
   - # ~200k slots below head at build time (2026-08-06, head ~437.60M).
     # Widen toward the 422M serving floor for the full ~72-day view.
-    start_block: 437400000
+    start_block: 422100000  # just above the serving floor (~72 days); widened 2026-08-06 23:00
     experimental:
       programs:
         - name: Earn
