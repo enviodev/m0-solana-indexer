@@ -1,0 +1,58 @@
+"""One yield-index propagation from Ethereum (rebase history for $M)."""
+type IndexUpdate {
+  id: ID! # txSig-instructionAddress
+  slot: Int!
+  time: Int
+  index: BigInt! # u64 yield index
+  txSignature: String!
+}
+
+"""A Portal (Wormhole adapter) bridge message, in or out."""
+type BridgeMessage {
+  id: ID! # txSig-instructionAddress
+  direction: String! # "in" (receive_message) | "out" (send_message)
+  slot: Int!
+  time: Int
+  destinationChainId: Int # only for outbound
+  payloadType: Int # only for outbound
+  mTokenDelta: BigInt # net $M mint/burn in the tx, from token balances
+  txSignature: String!
+}
+
+"""wM wrap/unwrap and yield claims."""
+type WMEvent {
+  id: ID! # txSig-instructionAddress
+  kind: String! # wrap | unwrap | claim_for
+  amount: BigInt!
+  tokenAuthority: String
+  slot: Int!
+  time: Int
+  txSignature: String!
+}
+
+"""Extension swap program activity (wrap/unwrap/swap between $M extensions)."""
+type ExtSwapEvent {
+  id: ID! # txSig-instructionAddress
+  kind: String! # swap | wrap | unwrap
+  amount: BigInt!
+  fromMint: String
+  toMint: String
+  signer: String
+  slot: Int!
+  time: Int
+  txSignature: String!
+}
+
+"""Running aggregates for the dashboard headline row."""
+type ProtocolStats {
+  id: ID! # "m0"
+  indexUpdates: Int!
+  latestIndex: BigInt!
+  bridgeIn: Int!
+  bridgeOut: Int!
+  netMBridged: BigInt!
+  wrapVolume: BigInt!
+  unwrapVolume: BigInt!
+  swapCount: Int!
+  lastSlot: Int!
+}

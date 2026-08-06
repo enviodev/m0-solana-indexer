@@ -1,0 +1,22 @@
+{
+  "name": "m0-solana",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "codegen": "envio codegen",
+    "dev": "envio dev",
+    "start": "envio start",
+    "test": "vitest run --test-timeout=20000"
+  },
+  "devDependencies": {
+    "@types/node": "24.12.2",
+    "typescript": "6.0.3",
+    "vitest": "4.1.0"
+  },
+  "dependencies": {
+    "envio": "file:/Users/jasonsmythe/.local/share/pnpm/store/v11/links/@/envio/3.5.1-svm-alpha.2/260474cb8a95c7d6ce209d95b9a46a4e9c66d11cf2f3e4dc5651f9680dbe67d4/node_modules/envio"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
