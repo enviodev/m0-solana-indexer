@@ -266,7 +266,13 @@ function TimeseriesView({ widget, data }: { widget: TimeseriesWidget; data: unkn
               tick={{ fontSize: 12, fill: "var(--muted)" }}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(v) => formatValue(v, widget.format === "percent" ? "percent" : "compact")}
+              tickFormatter={(v) =>
+                widget.format === "percent"
+                  ? formatValue(v, "percent")
+                  : Math.abs(Number(v)) < 10 && Number(v) % 1 !== 0
+                    ? Number(v).toFixed(widget.decimals ?? 4)
+                    : formatValue(v, "compact")
+              }
               domain={area ? [0, "auto"] : ["auto", "auto"]}
             />
             <Tooltip
