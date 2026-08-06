@@ -270,7 +270,7 @@ function TimeseriesView({ widget, data }: { widget: TimeseriesWidget; data: unkn
                 widget.format === "percent"
                   ? formatValue(v, "percent")
                   : Math.abs(Number(v)) < 10 && Number(v) % 1 !== 0
-                    ? Number(v).toFixed(widget.decimals ?? 4)
+                    ? Number(v).toFixed(4)
                     : formatValue(v, "compact")
               }
               domain={area ? [0, "auto"] : ["auto", "auto"]}

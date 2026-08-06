@@ -15,7 +15,7 @@ export const siteConfig: SiteConfig = {
     halo: true,
   },
 
-  endpoint: process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ?? "https://indexer.dev.hyperindex.xyz/1dba2c9/v1/graphql",
+  endpoint: process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ?? "https://indexer.dev.hyperindex.xyz/44b912b/v1/graphql",
 
   chains: [{ id: 7565164, label: "Solana" }],
   refresh: 30,
