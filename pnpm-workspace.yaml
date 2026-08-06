@@ -6,6 +6,7 @@ minimumReleaseAgeExclude:
   - envio-linux-arm64@3.5.1-svm-alpha.2
   - envio-linux-x64-musl@3.5.1-svm-alpha.2
   - envio-linux-x64@3.5.1-svm-alpha.2
+  - envio@3.5.1-svm-alpha.2
 
 onlyBuiltDependencies:
   - esbuild

@@ -36,6 +36,10 @@ async function updateStats(
   context.ProtocolStats.set({ ...prev, ...patch(prev), lastSlot: Math.max(prev.lastSlot, slot) });
 }
 
+
+const asBig = (v: unknown): bigint =>
+  typeof v === "bigint" ? v : BigInt(String(v ?? 0));
+
 function ixId(txSig: string | undefined, address: readonly number[]): string {
   return `${txSig ?? "unknown"}-${address.join(".")}`;
 }
@@ -47,7 +51,7 @@ indexer.onInstruction(
   async ({ instruction, context }) => {
     const txSig = instruction.transaction.signatures?.[0];
     const args = instruction.params?.args as { index?: bigint } | undefined;
-    const index = args?.index ?? 0n;
+    const index = asBig(args?.index ?? 0n);
     context.IndexUpdate.set({
       id: ixId(txSig, instruction.instructionAddress),
       slot: instruction.block.slot,
@@ -57,7 +61,7 @@ indexer.onInstruction(
     });
     await updateStats(context, instruction.block.slot, (prev) => ({
       indexUpdates: prev.indexUpdates + 1,
-      latestIndex: index > 0n ? index : prev.latestIndex,
+      latestIndex: index > 0n ? index : asBig(prev.latestIndex),
     }));
   },
 );
@@ -109,7 +113,7 @@ for (const [instructionName, direction] of [
       await updateStats(context, instruction.block.slot, (prev) => ({
         bridgeIn: prev.bridgeIn + (direction === "in" ? 1 : 0),
         bridgeOut: prev.bridgeOut + (direction === "out" ? 1 : 0),
-        netMBridged: prev.netMBridged + (delta ?? 0n),
+        netMBridged: asBig(prev.netMBridged) + (delta ?? 0n),
       }));
     },
   );
@@ -123,7 +127,7 @@ for (const kind of ["wrap", "unwrap", "claim_for"] as const) {
     const args = instruction.params?.args as
       | { amount?: bigint; snapshot_balance?: bigint }
       | undefined;
-    const amount = args?.amount ?? args?.snapshot_balance ?? 0n;
+    const amount = asBig(args?.amount ?? args?.snapshot_balance ?? 0n);
     const accounts: Readonly<Record<string, string>> = instruction.params?.accounts ?? {};
     context.WMEvent.set({
       id: ixId(txSig, instruction.instructionAddress),
@@ -135,8 +139,8 @@ for (const kind of ["wrap", "unwrap", "claim_for"] as const) {
       txSignature: txSig ?? "",
     });
     await updateStats(context, instruction.block.slot, (prev) => ({
-      wrapVolume: prev.wrapVolume + (kind === "wrap" ? amount : 0n),
-      unwrapVolume: prev.unwrapVolume + (kind === "unwrap" ? amount : 0n),
+      wrapVolume: asBig(prev.wrapVolume) + (kind === "wrap" ? asBig(amount) : 0n),
+      unwrapVolume: asBig(prev.unwrapVolume) + (kind === "unwrap" ? asBig(amount) : 0n),
     }));
   });
 }
@@ -151,7 +155,7 @@ for (const kind of ["swap", "wrap", "unwrap"] as const) {
     context.ExtSwapEvent.set({
       id: ixId(txSig, instruction.instructionAddress),
       kind,
-      amount: args?.amount ?? 0n,
+      amount: asBig(args?.amount ?? 0n),
       fromMint: accounts["from_mint"] ?? accounts["m_mint"],
       toMint: accounts["to_mint"],
       signer: accounts["signer"],
