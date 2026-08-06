@@ -57,6 +57,7 @@ indexer.onInstruction(
       slot: instruction.block.slot,
       time: instruction.block.time,
       index,
+      indexFloat: Number(index) / 1e12,
       txSignature: txSig ?? "",
     });
     await updateStats(context, instruction.block.slot, (prev) => ({

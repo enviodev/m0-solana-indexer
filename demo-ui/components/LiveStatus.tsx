@@ -2,7 +2,7 @@
 
 // Header chip proving the data is alive: reads chain_metadata from the same
 // GraphQL endpoint the widgets use and shows the latest synced block. Renders
-// nothing on failure — chrome never shows an error — and shows a "Sample data"
+// nothing on failure - chrome never shows an error - and shows a "Sample data"
 // chip in mock mode instead.
 
 import { useEffect, useState } from "react";
@@ -33,7 +33,7 @@ export function LiveStatus() {
         }
       })
       .catch(() => {
-        /* silent — a status chip must never surface an error */
+        /* silent - a status chip must never surface an error */
       });
     return () => {
       cancelled = true;
@@ -47,7 +47,7 @@ export function LiveStatus() {
   const label =
     rows.length > 1
       ? `Live · ${rows.length} chains synced`
-      : `Live · block ${new Intl.NumberFormat("en-US").format(top.latest_processed_block)}`;
+      : `Live · ${top.chain_id === 0 ? "slot" : "block"} ${new Intl.NumberFormat("en-US").format(top.latest_processed_block)}`;
 
   return (
     <span className="chip chip--live" title={rows.map((r) => `chain ${r.chain_id}: ${r.latest_processed_block}`).join("\n")}>

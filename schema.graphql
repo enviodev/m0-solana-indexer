@@ -3,7 +3,8 @@ type IndexUpdate {
   id: ID! # txSig-instructionAddress
   slot: Int!
   time: Int
-  index: BigInt! # u64 yield index
+  index: BigInt! # u64 yield index (fixed-point, 1e12 scale)
+  indexFloat: Float! # index / 1e12, for charting
   txSignature: String!
 }
 
