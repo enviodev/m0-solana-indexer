@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       envio:
-        specifier: file:/Users/jasonsmythe/.local/share/pnpm/store/v11/links/@/envio/3.5.1-svm-alpha.2/260474cb8a95c7d6ce209d95b9a46a4e9c66d11cf2f3e4dc5651f9680dbe67d4/node_modules/envio
-        version: file:../../../../../.local/share/pnpm/store/v11/links/@/envio/3.5.1-svm-alpha.2/260474cb8a95c7d6ce209d95b9a46a4e9c66d11cf2f3e4dc5651f9680dbe67d4/node_modules/envio(react-dom@19.2.8(react@19.2.5))(supports-color@8.1.1)(typescript@6.0.3)
+        specifier: 3.5.1-svm-alpha.2
+        version: 3.5.1-svm-alpha.2(react-dom@19.2.8(react@19.2.5))(supports-color@8.1.1)(typescript@6.0.3)
     devDependencies:
       '@types/node':
         specifier: 24.12.2
@@ -654,8 +654,8 @@ packages:
     os: [linux]
     libc: [glibc]
 
-  envio@file:../../../../../.local/share/pnpm/store/v11/links/@/envio/3.5.1-svm-alpha.2/260474cb8a95c7d6ce209d95b9a46a4e9c66d11cf2f3e4dc5651f9680dbe67d4/node_modules/envio:
-    resolution: {directory: ../../../../../.local/share/pnpm/store/v11/links/@/envio/3.5.1-svm-alpha.2/260474cb8a95c7d6ce209d95b9a46a4e9c66d11cf2f3e4dc5651f9680dbe67d4/node_modules/envio, type: directory}
+  envio@3.5.1-svm-alpha.2:
+    resolution: {integrity: sha512-nzrYsYhab7SpCfebBnR/RVmYZq8uugMWGiaT3x7jRvKM2HBhv1/mxcf7NhmPcxysX42a2m4opHnMVDQfxlYQSA==}
     engines: {node: '>=22.0.0'}
     hasBin: true
 
@@ -2005,7 +2005,7 @@ snapshots:
   envio-linux-x64@3.5.1-svm-alpha.2:
     optional: true
 
-  envio@file:../../../../../.local/share/pnpm/store/v11/links/@/envio/3.5.1-svm-alpha.2/260474cb8a95c7d6ce209d95b9a46a4e9c66d11cf2f3e4dc5651f9680dbe67d4/node_modules/envio(react-dom@19.2.8(react@19.2.5))(supports-color@8.1.1)(typescript@6.0.3):
+  envio@3.5.1-svm-alpha.2(react-dom@19.2.8(react@19.2.5))(supports-color@8.1.1)(typescript@6.0.3):
     dependencies:
       '@clickhouse/client': 1.17.0
       '@elastic/ecs-pino-format': 1.4.0
