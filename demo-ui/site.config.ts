@@ -15,7 +15,10 @@ export const siteConfig: SiteConfig = {
     halo: true,
   },
 
-  endpoint: process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ?? "https://indexer.dev.hyperindex.xyz/44b912b/v1/graphql",
+  // The live pointer is the Vercel project env var NEXT_PUBLIC_GRAPHQL_ENDPOINT, because a
+  // push here mints a new deployment hash and this default can never name it. Keep this
+  // fallback on the most recent known-good deployment rather than letting it rot.
+  endpoint: process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ?? "https://indexer.dev.hyperindex.xyz/023ccc8/v1/graphql",
 
   chains: [{ id: 7565164, label: "Solana" }],
   refresh: 30,
