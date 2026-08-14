@@ -5,9 +5,12 @@ description: >
   (rebase history), wM wrap/unwrap volume, and extension swaps.
 ecosystem: svm
 chains:
-  - # ~200k slots below head at build time (2026-08-06, head ~437.60M).
-    # Widen toward the 422M serving floor for the full ~72-day view.
-    start_block: 422100000  # just above the serving floor (~72 days); widened 2026-08-06 23:00
+  - # Full available history. 403,000,000 is the first slot
+    # solana-mainnet-history.hypersync.xyz serves (measured 2026-08-14: slot
+    # 402,999,999 returns nothing, 403,000,000 returns a block dated
+    # 2026-02-27 05:40 UTC). Anything earlier stalls rather than skipping
+    # forward, so do not lower this without re-probing the floor.
+    start_block: 403000000  # serving floor, ~5.5 months; widened from 422,100,000 on 2026-08-14
     experimental:
       programs:
         - name: Earn

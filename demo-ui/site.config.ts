@@ -4,7 +4,7 @@ import type { SiteConfig } from "@/lib/types";
 export const siteConfig: SiteConfig = {
   title: "M^0 Solana Analytics",
   subtitle:
-    "Live $M on Solana — yield index propagation, Portal bridge traffic, wM wrap and unwrap activity, and extension swaps, indexed in real time.",
+    "Live $M on Solana: yield index propagation, Portal bridge traffic, wM wrap and unwrap activity, and extension swaps. Indexed from slot 403,000,000 (27 Feb 2026), the earliest slot available, straight through to the chain tip.",
   protocolName: "M^0",
 
   theme: {
