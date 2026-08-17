@@ -40,8 +40,8 @@ async function updateStats(
 const asBig = (v: unknown): bigint =>
   typeof v === "bigint" ? v : BigInt(String(v ?? 0));
 
-function ixId(txSig: string | undefined, address: readonly number[]): string {
-  return `${txSig ?? "unknown"}-${address.join(".")}`;
+function ixId(txSig: string, address: readonly number[]): string {
+  return `${txSig}-${address.join(".")}`;
 }
 
 // ---- Earn: yield index propagation (rebase history) ----
@@ -49,7 +49,7 @@ function ixId(txSig: string | undefined, address: readonly number[]): string {
 indexer.onInstruction(
   { program: "Earn", instruction: "propagate_index" },
   async ({ instruction, context }) => {
-    const txSig = instruction.transaction.signatures?.[0];
+    const txSig = instruction.transaction.signature;
     const args = instruction.params?.args as { index?: bigint } | undefined;
     const index = asBig(args?.index ?? 0n);
     context.IndexUpdate.set({
@@ -58,7 +58,7 @@ indexer.onInstruction(
       time: instruction.block.time,
       index,
       indexFloat: Number(index) / 1e12,
-      txSignature: txSig ?? "",
+      txSignature: txSig,
     });
     await updateStats(context, instruction.block.slot, (prev) => ({
       indexUpdates: prev.indexUpdates + 1,
@@ -71,7 +71,7 @@ indexer.onInstruction(
 
 function mDelta(
   tokenBalances:
-    | readonly { mint?: string; preAmount?: string; postAmount?: string }[]
+    | readonly { mint?: string; preAmount?: bigint; postAmount?: bigint }[]
     | undefined,
 ): bigint | undefined {
   if (!tokenBalances) return undefined;
@@ -80,7 +80,7 @@ function mDelta(
   for (const tb of tokenBalances) {
     if (tb.mint !== M_MINT) continue;
     sawM = true;
-    delta += BigInt(tb.postAmount ?? "0") - BigInt(tb.preAmount ?? "0");
+    delta += (tb.postAmount ?? 0n) - (tb.preAmount ?? 0n);
   }
   return sawM ? delta : undefined;
 }
@@ -92,13 +92,13 @@ for (const [instructionName, direction] of [
   indexer.onInstruction(
     { program: "Portal", instruction: instructionName },
     async ({ instruction, context }) => {
-      const txSig = instruction.transaction.signatures?.[0];
+      const txSig = instruction.transaction.signature;
       const args = instruction.params?.args as
         | { m0_destination_chain_id?: number; payload_type?: number }
         | undefined;
       const delta = mDelta(
         (instruction.transaction as unknown as {
-          tokenBalances?: readonly { mint?: string; preAmount?: string; postAmount?: string }[];
+          tokenBalances?: readonly { mint?: string; preAmount?: bigint; postAmount?: bigint }[];
         }).tokenBalances,
       );
       context.BridgeMessage.set({
@@ -109,7 +109,7 @@ for (const [instructionName, direction] of [
         destinationChainId: args?.m0_destination_chain_id,
         payloadType: args?.payload_type,
         mTokenDelta: delta,
-        txSignature: txSig ?? "",
+        txSignature: txSig,
       });
       await updateStats(context, instruction.block.slot, (prev) => ({
         bridgeIn: prev.bridgeIn + (direction === "in" ? 1 : 0),
@@ -124,7 +124,7 @@ for (const [instructionName, direction] of [
 
 for (const kind of ["wrap", "unwrap", "claim_for"] as const) {
   indexer.onInstruction({ program: "WMExt", instruction: kind }, async ({ instruction, context }) => {
-    const txSig = instruction.transaction.signatures?.[0];
+    const txSig = instruction.transaction.signature;
     const args = instruction.params?.args as
       | { amount?: bigint; snapshot_balance?: bigint }
       | undefined;
@@ -137,7 +137,7 @@ for (const kind of ["wrap", "unwrap", "claim_for"] as const) {
       tokenAuthority: accounts["token_authority"] ?? accounts["earn_authority"],
       slot: instruction.block.slot,
       time: instruction.block.time,
-      txSignature: txSig ?? "",
+      txSignature: txSig,
     });
     await updateStats(context, instruction.block.slot, (prev) => ({
       wrapVolume: asBig(prev.wrapVolume) + (kind === "wrap" ? asBig(amount) : 0n),
@@ -150,7 +150,7 @@ for (const kind of ["wrap", "unwrap", "claim_for"] as const) {
 
 for (const kind of ["swap", "wrap", "unwrap"] as const) {
   indexer.onInstruction({ program: "ExtSwap", instruction: kind }, async ({ instruction, context }) => {
-    const txSig = instruction.transaction.signatures?.[0];
+    const txSig = instruction.transaction.signature;
     const args = instruction.params?.args as { amount?: bigint } | undefined;
     const accounts: Readonly<Record<string, string>> = instruction.params?.accounts ?? {};
     context.ExtSwapEvent.set({
@@ -162,7 +162,7 @@ for (const kind of ["swap", "wrap", "unwrap"] as const) {
       signer: accounts["signer"],
       slot: instruction.block.slot,
       time: instruction.block.time,
-      txSignature: txSig ?? "",
+      txSignature: txSig,
     });
     await updateStats(context, instruction.block.slot, (prev) => ({
       swapCount: prev.swapCount + (kind === "swap" ? 1 : 0),
