@@ -6,7 +6,7 @@ const SOLANA = 7565164;
 // Simulated instructions only run when their slot is inside the configured range.
 const START_SLOT = 403_000_000;
 
-const M_MINT = "mzerokyEX9TNDoK4o2YZQBDmMzjokAeN6M2g2S3pLJo";
+const M_MINT = "mzerojk9tg56ebsrEAhfkyc9VgKjTW2zDqp6C5mhjzH";
 const WM_MINT = "mzeroXDoBpRVhnEXBra27qzAMdxgpWVY3DzQW7xMVJp";
 const USER = "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM";
 const VAULT_ATA = "6EEwsUpHqvbXNvSVBGxBhCiTdvGDMg2XSMzsFRQu3S9j";
@@ -67,6 +67,7 @@ describe("M^0 Solana handlers", () => {
               slot: START_SLOT,
               path: [1],
               args: { guardian_set_index: 4, vaa_body: "0x" },
+              accounts: { m_mint: { address: M_MINT } },
               transaction: {
                 signature: SIG_A,
                 accountActivities: [

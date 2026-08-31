@@ -10,7 +10,14 @@
 import { indexer, type ProtocolStats } from "envio";
 
 const STATS_ID = "m0";
-const M_MINT = "mzerokyEX9TNDoK4o2YZQBDmMzjokAeN6M2g2S3pLJo";
+/**
+ * $M mint on Solana mainnet. `receive_message` names it as its `m_mint` account,
+ * which is preferred at runtime; this constant covers `send_message`, whose IDL
+ * accounts don't include the mint. (Verified against live Portal instructions
+ * 2026-08-31 — the previously hardcoded `mzeroky…pLJo` never matched, leaving
+ * every mTokenDelta null.)
+ */
+const M_MINT = "mzerojk9tg56ebsrEAhfkyc9VgKjTW2zDqp6C5mhjzH";
 
 const emptyStats: ProtocolStats = {
   id: STATS_ID,
@@ -87,11 +94,12 @@ function mDelta(
       | { mint: string; preAmount: bigint | undefined; postAmount: bigint | undefined }
       | undefined;
   }[],
+  mMint: string = M_MINT,
 ): bigint | undefined {
   let delta = 0n;
   let sawM = false;
   for (const a of activities) {
-    if (a.token?.mint !== M_MINT) continue;
+    if (a.token?.mint !== mMint) continue;
     sawM = true;
     delta += (a.token.postAmount ?? 0n) - (a.token.preAmount ?? 0n);
   }
@@ -129,7 +137,10 @@ indexer.onInstruction(
   { program: "Portal", instruction: "receive_message", fields: portalFields },
   async ({ instruction, context }) => {
     const txSig = instruction.transaction.signature;
-    const delta = mDelta(instruction.transaction.accountActivities);
+    const delta = mDelta(
+      instruction.transaction.accountActivities,
+      instruction.accounts.m_mint.address,
+    );
     context.BridgeMessage.set({
       id: ixId(txSig, instruction.path),
       direction: "in",
