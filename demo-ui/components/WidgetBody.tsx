@@ -507,7 +507,14 @@ function TableView({ widget, data }: { widget: TableWidget; data: unknown }) {
         <thead>
           <tr>
             {widget.columns.map((c, i) => (
-              <th key={i} className={c.align === "right" ? "num" : undefined}>
+              <th
+                key={i}
+                className={
+                  [c.align === "right" ? "num" : "", c.width === "grow" ? "grow" : ""]
+                    .filter(Boolean)
+                    .join(" ") || undefined
+                }
+              >
                 {c.header}
               </th>
             ))}

@@ -636,6 +636,7 @@ a.chip--accent:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(-
   color: var(--ink-2);
 }
 
+.table th.grow,
 .table td.grow { width: 100%; }
 
 .table td a {

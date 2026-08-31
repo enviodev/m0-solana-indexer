@@ -1,6 +1,6 @@
-# M^0 on Solana — analytics dashboard
+# M0 on Solana — analytics dashboard
 
-A config-driven Next.js dashboard that renders live data from the M^0 Solana
+A config-driven Next.js dashboard that renders live data from the M0 Solana
 [Envio HyperIndex](https://docs.envio.dev) GraphQL API (`../`). Point it at an
 endpoint, declare sections and widgets, deploy. It also runs entirely on
 built-in sample data, so it demos itself with no backend.

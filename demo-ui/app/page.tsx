@@ -1,7 +1,7 @@
 import { WidgetBody } from "@/components/WidgetBody";
 import { LiveStatus } from "@/components/LiveStatus";
 import { siteConfig } from "@/site.config";
-import { getEndpoint, playgroundUrl, slugify } from "@/lib/data";
+import { getEndpoint, slugify } from "@/lib/data";
 import type { Section, Widget } from "@/lib/types";
 
 function spanOf(widget: Widget): number {
@@ -137,9 +137,7 @@ export default function Page() {
         {endpoint ? (
           <div className="footer-endpoint">
             <span>GraphQL</span>
-            <a href={playgroundUrl(endpoint)} target="_blank" rel="noreferrer" title="Open the query console">
-              <code>{endpoint}</code>
-            </a>
+            <code>{endpoint}</code>
           </div>
         ) : null}
       </footer>

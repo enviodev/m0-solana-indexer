@@ -16,11 +16,6 @@ export function isMockMode(): boolean {
   return process.env.NEXT_PUBLIC_MOCK === "1" || getEndpoint() === "";
 }
 
-/** Hasura console / playground URL for a HyperIndex GraphQL endpoint. */
-export function playgroundUrl(endpoint: string): string {
-  return endpoint.replace(/\/v1\/graphql\/?$/, "/console");
-}
-
 /**
  * Resolve a dot-path against an object. When traversal hits an array, the
  * remaining path is mapped over every element, so "Rows.amount" against

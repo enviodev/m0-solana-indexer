@@ -1,4 +1,4 @@
-// M^0 on Solana — live data console. Everything the page shows is declared here.
+// M0 on Solana — live data console. Everything the page shows is declared here.
 import type { SiteConfig } from "@/lib/types";
 
 // The live pointer is the Vercel project env var NEXT_PUBLIC_GRAPHQL_ENDPOINT (every
@@ -16,11 +16,11 @@ const SIG_B = "4zLpDABTQHNTH1nZzcAgumdfEEuqfdeQBADWPTyrazHsLxycSa2G2xft8wGGTy67h
 const SIG_C = "2wxp2Xszpiov8xMW7pYA5iyNvjmib98f1gKBnABbujUWY13TmZRtU8xKSHavLZWpZZo8L2zX28GGUuw4zueAT3xE";
 
 export const siteConfig: SiteConfig = {
-  title: "M^0 on Solana",
+  title: "M0 on Solana",
   eyebrow: "Live protocol analytics",
   subtitle:
     "$M supply moving through the Portal bridge, the yield index propagated from Ethereum, wM wrap and unwrap flow, and swaps between $M extensions — decoded from the on-chain programs and kept current to the chain tip.",
-  protocolName: "M^0",
+  protocolName: "M0",
   protocolTag: "Solana",
 
   theme: {
@@ -34,12 +34,12 @@ export const siteConfig: SiteConfig = {
   endpoint: process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ?? ENDPOINT,
 
   chains: [{ id: 7565164, label: "Solana mainnet" }],
-  refresh: 30,
+  refresh: 2,
 
   facts: [
     { label: "Indexed from", value: "slot 403,000,000 · 27 Feb 2026" },
     { label: "Programs", value: "Earn · Portal · wM · Ext. swap" },
-    { label: "Source", value: "HyperSync · refreshed every 30 s", href: "https://docs.envio.dev/docs/HyperIndex/solana" },
+    { label: "Data", value: "Envio HyperIndex · refreshed live", href: "https://docs.envio.dev/docs/HyperIndex/solana" },
   ],
 
   hero: {
@@ -115,7 +115,7 @@ export const siteConfig: SiteConfig = {
             { header: "When", path: "IndexUpdate.time", format: "timeAgo" },
             { header: "Slot", path: "IndexUpdate.slot", format: "number", decimals: 0, align: "right" },
             { header: "Index", path: "IndexUpdate.index", format: "bigintDecimals", decimals: 12, fractionDigits: 9, align: "right" },
-            { header: "Transaction", path: "IndexUpdate.txSignature", truncate: "middle", linkTemplate: TX, width: "grow" },
+            { header: "Transaction", path: "IndexUpdate.txSignature", truncate: "middle", linkTemplate: TX, width: "grow", align: "right" },
           ],
           limit: 8,
           sample: {
@@ -187,7 +187,7 @@ export const siteConfig: SiteConfig = {
             { header: "Δ $M", path: "BridgeMessage.mTokenDelta", format: "signedDecimals", decimals: 6, align: "right" },
             { header: "Dest. chain", path: "BridgeMessage.destinationChainId", format: "number", decimals: 0, align: "right" },
             { header: "Slot", path: "BridgeMessage.slot", format: "number", decimals: 0, align: "right" },
-            { header: "Transaction", path: "BridgeMessage.txSignature", truncate: "middle", linkTemplate: TX, width: "grow" },
+            { header: "Transaction", path: "BridgeMessage.txSignature", truncate: "middle", linkTemplate: TX, width: "grow", align: "right" },
           ],
           limit: 10,
           sample: {
@@ -260,7 +260,7 @@ export const siteConfig: SiteConfig = {
             },
             { header: "Amount", path: "WMEvent.amount", format: "bigintDecimals", decimals: 6, align: "right", unit: "$M" },
             { header: "Authority", path: "WMEvent.tokenAuthority", truncate: "middle", linkTemplate: ACCOUNT },
-            { header: "Tx", path: "WMEvent.txSignature", truncate: "middle", linkTemplate: TX, width: "grow" },
+            { header: "Tx", path: "WMEvent.txSignature", truncate: "middle", linkTemplate: TX, width: "grow", align: "right" },
           ],
           limit: 6,
           sample: {
@@ -291,7 +291,7 @@ export const siteConfig: SiteConfig = {
             { header: "Amount", path: "ExtSwapEvent.amount", format: "bigintDecimals", decimals: 6, align: "right" },
             { header: "From", path: "ExtSwapEvent.fromMint", truncate: "middle", linkTemplate: ACCOUNT },
             { header: "To", path: "ExtSwapEvent.toMint", truncate: "middle", linkTemplate: ACCOUNT },
-            { header: "Tx", path: "ExtSwapEvent.txSignature", truncate: "middle", linkTemplate: TX, width: "grow" },
+            { header: "Tx", path: "ExtSwapEvent.txSignature", truncate: "middle", linkTemplate: TX, width: "grow", align: "right" },
           ],
           limit: 6,
           sample: {
@@ -307,7 +307,7 @@ export const siteConfig: SiteConfig = {
   ],
 
   footerLinks: [
-    { label: "M^0", href: "https://www.m0.org" },
+    { label: "M0", href: "https://www.m0.org" },
     { label: "Envio HyperIndex", href: "https://docs.envio.dev/docs/HyperIndex/solana" },
     { label: "Indexer source", href: "https://github.com/enviodev/m0-solana-indexer" },
   ],
