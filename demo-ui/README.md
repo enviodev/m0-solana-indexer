@@ -1,9 +1,9 @@
-# Envio demo frontend
+# M^0 on Solana — analytics dashboard
 
-A small, config-driven Next.js dashboard that renders live data from an
-[Envio HyperIndex](https://docs.envio.dev) GraphQL API. Point it at an endpoint,
-pick a few widgets, deploy. It also runs entirely on built-in sample data, so it
-demos itself with no backend.
+A config-driven Next.js dashboard that renders live data from the M^0 Solana
+[Envio HyperIndex](https://docs.envio.dev) GraphQL API (`../`). Point it at an
+endpoint, declare sections and widgets, deploy. It also runs entirely on
+built-in sample data, so it demos itself with no backend.
 
 ## The one file you edit: `site.config.ts`
 
@@ -89,6 +89,19 @@ vercel deploy --prod
 
 Set `NEXT_PUBLIC_GRAPHQL_ENDPOINT` in the Vercel project (or bake it into
 `site.config.ts`) so production talks to the live indexer instead of sample data.
+
+## v3 config surface (August 2026 redesign)
+
+- `sections[]` — titled groups (`eyebrow`, `title`, `description`, `widgets`) each on
+  its own 12-column grid; `widgets` at the root is still honored as a single group
+- `eyebrow`, `protocolTag`, `facts[]` — hero copy: label/value pairs under the subtitle
+- Stat: `unit` suffix, `meta` (secondary fact line, e.g. last propagated · 12m ago),
+  `format: "signedDecimals"` tints positive/negative
+- Table column formats: `badge` (with `badges: { raw: { label, tone } }`),
+  `signedDecimals`, `timeAgo` (absolute time on hover), `datetime`; `unit`; `width: "grow"`
+- Charts: `scale` divides y by 10^n (base units → tokens); timeseries `height: "lg"`
+- Typography: Inter + JetBrains Mono via `next/font` (self-hosted at build)
+- `app/opengraph-image.tsx` renders the social card from the config
 
 ## v2 config surface (July 2026 redesign)
 

@@ -8,7 +8,7 @@
 //   lines 2px round · area washes ≤12% opacity · bars ≤24px with 4px rounded
 //   data-ends and square baselines · solid hairline gridlines, never dashed ·
 //   values/labels wear ink tokens, never the series color · a legend appears
-//   iff there are ≥2 series.
+//   iff there are ≥2 series · status colors (good/bad) only for signed deltas.
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
@@ -27,6 +27,7 @@ import {
   YAxis,
 } from "recharts";
 import {
+  absoluteTime,
   computeDeltaPct,
   formatX,
   firstScalar,
@@ -35,6 +36,9 @@ import {
   getEndpoint,
   isMockMode,
   middleTruncate,
+  scaleNumber,
+  signOf,
+  timeAgo,
   toArray,
 } from "@/lib/data";
 import type {
@@ -42,6 +46,7 @@ import type {
   Format,
   Series,
   StatWidget,
+  TableColumn,
   TableWidget,
   TimeseriesWidget,
   Widget,
@@ -74,23 +79,23 @@ function useWidgetData(widget: Widget): DataState {
 
     const run = () =>
       fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: widget.query }),
-    })
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`Request failed (HTTP ${res.status})`);
-        const json = await res.json();
-        if (json.errors?.length) throw new Error(json.errors[0]?.message ?? "GraphQL error");
-        return json.data;
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: widget.query }),
       })
-      .then((data) => {
-        if (!cancelled) setState({ status: "success", data });
-      })
-      .catch((err: unknown) => {
-        if (!cancelled)
-          setState({ status: "error", message: err instanceof Error ? err.message : String(err) });
-      });
+        .then(async (res) => {
+          if (!res.ok) throw new Error(`Request failed (HTTP ${res.status})`);
+          const json = await res.json();
+          if (json.errors?.length) throw new Error(json.errors[0]?.message ?? "GraphQL error");
+          return json.data;
+        })
+        .then((data) => {
+          if (!cancelled) setState({ status: "success", data });
+        })
+        .catch((err: unknown) => {
+          if (!cancelled)
+            setState({ status: "error", message: err instanceof Error ? err.message : String(err) });
+        });
 
     run();
     const every = (widget.refreshSeconds ?? siteConfig.refresh ?? 0) * 1000;
@@ -109,6 +114,17 @@ function useMounted(): boolean {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   return mounted;
+}
+
+/** Wall clock that ticks every 30s, null until mounted (avoids hydration drift). */
+function useNow(): number | null {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  return now;
 }
 
 export function WidgetBody({ widget }: { widget: Widget }) {
@@ -132,6 +148,7 @@ export function WidgetBody({ widget }: { widget: Widget }) {
 /* ---------------------------------------------------------------- stat --- */
 
 function StatView({ widget, data }: { widget: StatWidget; data: unknown }) {
+  const now = useNow();
   const raw = firstScalar(getByPath(data, widget.path));
   const sparkPoints = useMemo(() => {
     if (!widget.spark) return null;
@@ -140,29 +157,52 @@ function StatView({ widget, data }: { widget: StatWidget; data: unknown }) {
 
   if (raw === null || raw === undefined) return <Notice tone="empty">No data yet</Notice>;
 
-  const deltaPct =
-    sparkPoints && !widget.hideDelta ? computeDeltaPct(sparkPoints) : null;
+  const deltaPct = sparkPoints && !widget.hideDelta ? computeDeltaPct(sparkPoints) : null;
   const goodWhenUp = (widget.deltaGoodWhen ?? "up") === "up";
   const deltaTone =
-    deltaPct === null || deltaPct === 0
-      ? "flat"
-      : (deltaPct > 0) === goodWhenUp
-        ? "good"
-        : "bad";
+    deltaPct === null || deltaPct === 0 ? "flat" : (deltaPct > 0) === goodWhenUp ? "good" : "bad";
+
+  const signed = widget.format === "signedDecimals";
+  const sign = signed ? signOf(raw) : 0;
+  const valueClass = ["stat-value", sign > 0 ? "is-pos" : "", sign < 0 ? "is-neg" : ""]
+    .filter(Boolean)
+    .join(" ");
+
+  const metaRaw = widget.meta ? firstScalar(getByPath(data, widget.meta.path)) : undefined;
 
   return (
     <div className="stat">
       <div className="stat-row">
-        <span className="stat-value"><AnimatedNumber value={raw} format={widget.format} decimals={widget.decimals} /></span>
+        <span className={valueClass}>
+          <AnimatedNumber
+            value={raw}
+            format={widget.format}
+            decimals={widget.decimals}
+            fractionDigits={widget.fractionDigits}
+          />
+          {widget.unit ? <span className="stat-unit">{widget.unit}</span> : null}
+        </span>
         {deltaPct !== null ? (
           <span className={`delta delta--${deltaTone}`}>
             {deltaPct > 0 ? "▲" : deltaPct < 0 ? "▼" : "—"}{" "}
-            {Math.abs(deltaPct).toFixed(Math.abs(deltaPct) < 10 ? 1 : 0)}%
+            {Math.abs(deltaPct).toFixed(Math.abs(deltaPct) < 10 ? 2 : 0)}%
           </span>
         ) : null}
       </div>
       {sparkPoints && sparkPoints.length > 1 ? <Sparkline points={sparkPoints} /> : null}
       {widget.caption ? <p className="stat-caption">{widget.caption}</p> : null}
+      {widget.meta && metaRaw !== undefined && metaRaw !== null ? (
+        <div className="stat-meta">
+          <span>{widget.meta.label}</span>
+          <span className="num" title={widget.meta.format === "timeAgo" ? absoluteTime(metaRaw) : undefined}>
+            {widget.meta.format === "timeAgo"
+              ? now
+                ? timeAgo(metaRaw, now)
+                : formatValue(metaRaw, "datetime")
+              : formatValue(metaRaw, widget.meta.format, widget.meta.decimals)}
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -203,6 +243,17 @@ function normalizeSeries(widget: TimeseriesWidget): Series[] {
   return [];
 }
 
+function axisTick(v: unknown, format?: Format): string {
+  const n = Number(v);
+  if (format === "percent") return formatValue(n, "percent");
+  if (Math.abs(n) < 10 && n % 1 !== 0) {
+    // Small fractional domains (an index near 1.0x): show enough precision to
+    // separate adjacent ticks instead of collapsing them to "1.1".
+    return n.toFixed(4);
+  }
+  return formatValue(n, "compact");
+}
+
 function TimeseriesView({ widget, data }: { widget: TimeseriesWidget; data: unknown }) {
   const mounted = useMounted();
   const seriesDefs = useMemo(() => normalizeSeries(widget), [widget]);
@@ -214,16 +265,17 @@ function TimeseriesView({ widget, data }: { widget: TimeseriesWidget; data: unkn
     const out: Record<string, unknown>[] = [];
     for (let i = 0; i < n; i++) {
       const row: Record<string, unknown> = { x: formatX(xs[i], widget.xFormat) };
-      seriesDefs.forEach((_, si) => (row[`y${si}`] = Number(ys[si][i])));
+      seriesDefs.forEach((_, si) => (row[`y${si}`] = scaleNumber(ys[si][i], widget.scale)));
       out.push(row);
     }
     if (widget.reverse) out.reverse();
     return out;
-  }, [data, widget.xPath, widget.xFormat, widget.reverse, seriesDefs]);
+  }, [data, widget.xPath, widget.xFormat, widget.reverse, widget.scale, seriesDefs]);
 
   if (seriesDefs.length === 0 || points.length === 0)
     return <Notice tone="empty">No data points</Notice>;
-  if (!mounted) return <div className="chart chart--pending" />;
+  const heightClass = widget.height === "lg" ? "chart chart--lg" : "chart";
+  if (!mounted) return <div className={`${heightClass} chart--pending`} />;
 
   const area = (widget.variant ?? "area") === "area";
   const Chart = area ? AreaChart : LineChart;
@@ -240,7 +292,7 @@ function TimeseriesView({ widget, data }: { widget: TimeseriesWidget; data: unkn
           ))}
         </div>
       ) : null}
-      <div className="chart">
+      <div className={heightClass}>
         <ResponsiveContainer width="100%" height="100%">
           <Chart data={points} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
             {area ? (
@@ -262,17 +314,11 @@ function TimeseriesView({ widget, data }: { widget: TimeseriesWidget; data: unkn
               minTickGap={32}
             />
             <YAxis
-              width={52}
-              tick={{ fontSize: 12, fill: "var(--muted)" }}
+              width={58}
+              tick={{ fontSize: 12, fill: "var(--muted)", fontFamily: "var(--font-mono)" }}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(v) =>
-                widget.format === "percent"
-                  ? formatValue(v, "percent")
-                  : Math.abs(Number(v)) < 10 && Number(v) % 1 !== 0
-                    ? Number(v).toFixed(4)
-                    : formatValue(v, "compact")
-              }
+              tickFormatter={(v) => axisTick(v, widget.format)}
               domain={area ? [0, "auto"] : ["auto", "auto"]}
             />
             <Tooltip
@@ -281,7 +327,9 @@ function TimeseriesView({ widget, data }: { widget: TimeseriesWidget; data: unkn
                 <ChartTooltip
                   format={widget.format}
                   decimals={widget.decimals}
-                  labels={seriesDefs.map((s, i) => s.label ?? (seriesDefs.length > 1 ? `Series ${i + 1}` : widget.yLabel ?? ""))}
+                  labels={seriesDefs.map(
+                    (s, i) => s.label ?? (seriesDefs.length > 1 ? `Series ${i + 1}` : widget.yLabel ?? ""),
+                  )}
                 />
               }
             />
@@ -332,9 +380,7 @@ function ChartTooltip(props: {
       <div className="tooltip-x">{String(label)}</div>
       {payload.map((p, i) => (
         <div key={i} className="tooltip-row">
-          {payload.length > 1 ? (
-            <span className="legend-mark" style={{ background: p.color }} />
-          ) : null}
+          {payload.length > 1 ? <span className="legend-mark" style={{ background: p.color }} /> : null}
           {labels[i] ? <span className="tooltip-label">{labels[i]}</span> : null}
           <span className="tooltip-y">{formatValue(p.value, format, decimals)}</span>
         </div>
@@ -352,10 +398,11 @@ function BarsView({ widget, data }: { widget: BarsWidget; data: unknown }) {
     const ys = toArray(getByPath(data, widget.yPath));
     const n = Math.min(xs.length, ys.length);
     const out: { x: unknown; y: number }[] = [];
-    for (let i = 0; i < n; i++) out.push({ x: formatX(xs[i], widget.xFormat), y: Number(ys[i]) });
+    for (let i = 0; i < n; i++)
+      out.push({ x: formatX(xs[i], widget.xFormat), y: scaleNumber(ys[i], widget.scale) });
     if (widget.reverse) out.reverse();
     return out;
-  }, [data, widget.xPath, widget.yPath, widget.xFormat, widget.reverse]);
+  }, [data, widget.xPath, widget.yPath, widget.xFormat, widget.reverse, widget.scale]);
 
   if (points.length === 0) return <Notice tone="empty">No data points</Notice>;
   if (!mounted) return <div className="chart chart--pending" />;
@@ -373,8 +420,8 @@ function BarsView({ widget, data }: { widget: BarsWidget; data: unknown }) {
             minTickGap={32}
           />
           <YAxis
-            width={52}
-            tick={{ fontSize: 12, fill: "var(--muted)" }}
+            width={58}
+            tick={{ fontSize: 12, fill: "var(--muted)", fontFamily: "var(--font-mono)" }}
             tickLine={false}
             axisLine={false}
             tickFormatter={(v) => formatValue(v, "compact")}
@@ -392,7 +439,57 @@ function BarsView({ widget, data }: { widget: BarsWidget; data: unknown }) {
 
 /* --------------------------------------------------------------- table --- */
 
+function Cell({ col, cell, now }: { col: TableColumn; cell: unknown; now: number | null }) {
+  const rawStr = cell == null ? "" : String(cell);
+
+  if (col.format === "badge") {
+    if (!rawStr) return <>—</>;
+    const b = col.badges?.[rawStr];
+    return <span className={`badge badge--${b?.tone ?? "neutral"}`}>{b?.label ?? rawStr}</span>;
+  }
+
+  if (col.format === "timeAgo") {
+    if (!rawStr) return <>—</>;
+    const abs = absoluteTime(cell);
+    return (
+      <time dateTime={abs ? new Date(Number(cell) * 1000).toISOString() : undefined} title={abs}>
+        {now ? timeAgo(cell, now) : formatValue(cell, "datetime")}
+      </time>
+    );
+  }
+
+  let display: React.ReactNode;
+  if (col.truncate === "middle") {
+    display = middleTruncate(rawStr);
+  } else if (col.format === "signedDecimals") {
+    const s = signOf(cell);
+    display = (
+      <span className={`signed signed--${s > 0 ? "pos" : s < 0 ? "neg" : "zero"}`}>
+        {formatValue(cell, col.format, col.decimals, col.fractionDigits)}
+        {col.unit && rawStr ? <span className="cell-unit">{col.unit}</span> : null}
+      </span>
+    );
+  } else {
+    display = (
+      <>
+        {formatValue(cell, col.format, col.decimals, col.fractionDigits)}
+        {col.unit && rawStr ? <span className="cell-unit">{col.unit}</span> : null}
+      </>
+    );
+  }
+
+  if (col.linkTemplate && rawStr) {
+    return (
+      <a href={col.linkTemplate.replaceAll("{value}", rawStr)} target="_blank" rel="noreferrer">
+        {display}
+      </a>
+    );
+  }
+  return <>{display}</>;
+}
+
 function TableView({ widget, data }: { widget: TableWidget; data: unknown }) {
+  const now = useNow();
   const rows = useMemo(() => {
     const cols = widget.columns.map((c) => toArray(getByPath(data, c.path)));
     const length = cols.reduce((max, c) => Math.max(max, c.length), 0);
@@ -402,7 +499,7 @@ function TableView({ widget, data }: { widget: TableWidget; data: unknown }) {
     return out;
   }, [data, widget]);
 
-  if (rows.length === 0) return <Notice tone="empty">No rows</Notice>;
+  if (rows.length === 0) return <Notice tone="empty">No rows yet</Notice>;
 
   return (
     <div className="table-wrap">
@@ -422,33 +519,17 @@ function TableView({ widget, data }: { widget: TableWidget; data: unknown }) {
               {row.map((cell, ci) => {
                 const col = widget.columns[ci];
                 const rawStr = cell == null ? "" : String(cell);
-                const display =
-                  col.truncate === "middle"
-                    ? middleTruncate(rawStr)
-                    : formatValue(cell, col.format, col.decimals);
-                const content = col.linkTemplate && rawStr ? (
-                  <a
-                    href={col.linkTemplate.replaceAll("{value}", rawStr)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {display}
-                  </a>
-                ) : (
-                  display
-                );
+                const className =
+                  [
+                    col.align === "right" ? "num" : "",
+                    col.truncate === "middle" ? "mono" : "",
+                    col.width === "grow" ? "grow" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ") || undefined;
                 return (
-                  <td
-                    key={ci}
-                    title={rawStr || undefined}
-                    className={[
-                      col.align === "right" ? "num" : "",
-                      col.truncate === "middle" ? "mono" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ") || undefined}
-                  >
-                    {content}
+                  <td key={ci} title={col.truncate === "middle" ? rawStr || undefined : undefined} className={className}>
+                    <Cell col={col} cell={cell} now={now} />
                   </td>
                 );
               })}

@@ -14,25 +14,28 @@ export function AnimatedNumber({
   value,
   format,
   decimals,
+  fractionDigits,
 }: {
   value: unknown;
   format?: Format;
   decimals?: number;
+  fractionDigits?: number;
 }) {
   const numeric = Number(value);
   const animatable =
     Number.isFinite(numeric) &&
     format !== "bigintDecimals" &&
+    format !== "signedDecimals" &&
     Math.abs(numeric) < Number.MAX_SAFE_INTEGER;
 
   const motion = useMotionValue(animatable ? numeric : 0);
   const spring = useSpring(motion, { stiffness: 90, damping: 22, mass: 0.6 });
-  const [display, setDisplay] = useState(() => formatValue(value, format, decimals));
+  const [display, setDisplay] = useState(() => formatValue(value, format, decimals, fractionDigits));
   const first = useRef(true);
 
   useEffect(() => {
     if (!animatable) {
-      setDisplay(formatValue(value, format, decimals));
+      setDisplay(formatValue(value, format, decimals, fractionDigits));
       return;
     }
     if (first.current) {
@@ -43,7 +46,7 @@ export function AnimatedNumber({
       return;
     }
     motion.set(numeric);
-  }, [numeric, animatable, value, format, decimals, motion]);
+  }, [numeric, animatable, value, format, decimals, fractionDigits, motion]);
 
   useEffect(() => {
     if (!animatable) return;

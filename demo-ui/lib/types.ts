@@ -1,11 +1,30 @@
 // Shared types for the site config. See ../site.config.ts for a filled-in example.
 // Everything new is optional — configs written against the older template keep working.
 
-/** How a raw value pulled out of the GraphQL response should be displayed. */
-export type Format = "number" | "usd" | "bigintDecimals" | "percent" | "compact";
+/**
+ * How a raw value pulled out of the GraphQL response should be displayed.
+ *  - number / usd / percent / compact: plain numerics
+ *  - bigintDecimals: integer base units scaled by `decimals` (default 18)
+ *  - signedDecimals: bigintDecimals with an explicit sign, tinted good/bad
+ *  - timeAgo: epoch seconds → "12m ago" (full timestamp on hover)
+ *  - datetime: epoch seconds → short absolute date/time
+ *  - badge: categorical label rendered as a tinted pill (see TableColumn.badges)
+ */
+export type Format =
+  | "number"
+  | "usd"
+  | "bigintDecimals"
+  | "signedDecimals"
+  | "percent"
+  | "compact"
+  | "timeAgo"
+  | "datetime"
+  | "badge";
 
 /** Grid width of a card on the 12-column desktop grid. Defaults: stat 4, others 8. */
-export type Span = 4 | 6 | 8 | 12;
+export type Span = 3 | 4 | 6 | 8 | 9 | 12;
+
+export type Tone = "neutral" | "accent" | "good" | "bad" | "warn";
 
 interface WidgetBase {
   /** Card heading. */
@@ -34,6 +53,15 @@ export interface Spark {
   xPath?: string;
 }
 
+/** A secondary fact under a stat, e.g. "Last propagated · 12m ago". */
+export interface StatMeta {
+  label: string;
+  /** Dot-path into the same response. */
+  path: string;
+  format?: Format;
+  decimals?: number;
+}
+
 /** A single headline number. */
 export interface StatWidget extends WidgetBase {
   kind: "stat";
@@ -42,12 +70,18 @@ export interface StatWidget extends WidgetBase {
   format?: Format;
   /** Fraction digits for number/usd/percent; token decimals for bigintDecimals (default 18). */
   decimals?: number;
+  /** Fractional digits to display for bigintDecimals/signedDecimals (default 2). */
+  fractionDigits?: number;
+  /** Unit suffix rendered after the value in muted ink, e.g. "$M". */
+  unit?: string;
   /** Render a sparkline + delta chip from a series in the same response. */
   spark?: Spark;
   /** Which direction is good for the delta chip (default "up"). */
   deltaGoodWhen?: "up" | "down";
   /** Hide the auto delta chip even when spark is present. */
   hideDelta?: boolean;
+  /** Secondary fact line under the value. */
+  meta?: StatMeta;
 }
 
 export interface Series {
@@ -70,12 +104,16 @@ export interface TimeseriesWidget extends WidgetBase {
   format?: Format;
   /** Fraction digits for tooltip values (axis ticks stay compact). */
   decimals?: number;
+  /** Divide y values by 10^scale before plotting (token base units → whole tokens). */
+  scale?: number;
   /** Interpret x values for tick labels: raw (default) | epochDays | epochSeconds. */
   xFormat?: "epochDays" | "epochSeconds";
   /** Reverse point order (for queries returned in desc order). */
   reverse?: boolean;
   /** "area" (default) = 2px line + soft wash; "line" = line only. */
   variant?: "area" | "line";
+  /** Taller plot for a section-defining chart. */
+  height?: "md" | "lg";
 }
 
 /** Discrete columns — daily volumes, counts per period. */
@@ -86,6 +124,8 @@ export interface BarsWidget extends WidgetBase {
   yLabel?: string;
   format?: Format;
   decimals?: number;
+  /** Divide y values by 10^scale before plotting. */
+  scale?: number;
   /** Interpret x values for tick labels: raw (default) | epochDays | epochSeconds. */
   xFormat?: "epochDays" | "epochSeconds";
   /** Reverse point order (for queries returned in desc order). */
@@ -99,12 +139,20 @@ export interface TableColumn {
   format?: Format;
   /** Token decimals for bigintDecimals columns (default 18). */
   decimals?: number;
+  /** Fractional digits to display for bigintDecimals/signedDecimals (default 2). */
+  fractionDigits?: number;
   /** Right-align numeric columns. */
   align?: "left" | "right";
   /** Middle-ellipsis long identifiers (addresses, hashes) in monospace. */
   truncate?: "middle";
   /** Render as a link; "{value}" is replaced (e.g. "https://etherscan.io/tx/{value}"). */
   linkTemplate?: string;
+  /** For format "badge": raw value → { label, tone }. Unlisted values render neutral. */
+  badges?: Record<string, { label: string; tone?: Tone }>;
+  /** Unit suffix appended to formatted numerics, e.g. "$M". */
+  unit?: string;
+  /** Column width hint; "grow" takes remaining space. */
+  width?: "grow";
 }
 
 /** A recent-rows table. */
@@ -117,16 +165,35 @@ export interface TableWidget extends WidgetBase {
 
 export type Widget = StatWidget | TimeseriesWidget | BarsWidget | TableWidget;
 
+/** A titled group of widgets with its own 12-column grid. */
+export interface Section {
+  /** Anchor id (defaults to a slug of the title). */
+  id?: string;
+  /** Small eyebrow above the title, e.g. "01 · Yield". */
+  eyebrow?: string;
+  title: string;
+  /** One factual sentence about what this section covers. */
+  description?: string;
+  widgets: Widget[];
+}
+
 export interface FooterLink {
   label: string;
   href: string;
 }
 
 export interface ChainChip {
-  /** EVM chain id (informational). */
+  /** Chain id (informational). */
   id: number;
   /** Short label shown in the header, e.g. "Ethereum". */
   label: string;
+}
+
+/** A label/value pair shown under the hero copy, e.g. "Indexed from · slot 403,000,000". */
+export interface Fact {
+  label: string;
+  value: string;
+  href?: string;
 }
 
 /** Per-prospect look & feel. Everything optional; sensible defaults apply. */
@@ -151,6 +218,10 @@ export interface SiteConfig {
   /** One factual sentence about coverage. */
   subtitle: string;
   protocolName: string;
+  /** Short qualifier next to the wordmark, e.g. "Solana". */
+  protocolTag?: string;
+  /** Small eyebrow above the H1, e.g. "Live protocol data". */
+  eyebrow?: string;
   /** Legacy accent (still honored). Prefer `theme.accent`. */
   accentColor?: string;
   theme?: Theme;
@@ -158,13 +229,18 @@ export interface SiteConfig {
   endpoint: string;
   /** Chains covered — rendered as header chips. */
   chains?: ChainChip[];
-  /** Show the live "synced to block N" chip (reads chain_metadata; default true). */
+  /** Show the live "synced to slot N" chip (reads chain_metadata; default true). */
   liveStatus?: boolean;
   /** Default widget re-fetch interval in seconds (0/unset = static page). */
   refresh?: number;
   /** Optional dominant hero metric shown beside the title. */
   hero?: StatWidget;
-  widgets: Widget[];
+  /** Facts rendered under the hero copy. */
+  facts?: Fact[];
+  /** Grouped layout. When present, `widgets` is ignored. */
+  sections?: Section[];
+  /** Flat layout (legacy). */
+  widgets?: Widget[];
   footerLinks?: FooterLink[];
 }
 
