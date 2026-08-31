@@ -5,3 +5,4 @@ dev.log
 *.log
 demo-ui/node_modules/
 demo-ui/.next/
+.pnpm-store

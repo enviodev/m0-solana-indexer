@@ -5,12 +5,13 @@ description: >
   (rebase history), wM wrap/unwrap volume, and extension swaps.
 ecosystem: svm
 chains:
-  - # Full available history. 403,000,000 is the first slot
-    # solana-mainnet-history.hypersync.xyz serves (measured 2026-08-14: slot
-    # 402,999,999 returns nothing, 403,000,000 returns a block dated
-    # 2026-02-27 05:40 UTC). Anything earlier stalls rather than skipping
-    # forward, so do not lower this without re-probing the floor.
-    start_block: 403000000  # serving floor, ~5.5 months; widened from 422,100,000 on 2026-08-14
+  - id: solana # Envio chain id 7565164; HyperSync defaults to https://solana.hypersync.xyz
+    # Full available history. 403,000,000 is the first slot the HyperSync
+    # endpoint serves (measured 2026-08-14: slot 402,999,999 returns nothing,
+    # 403,000,000 returns a block dated 2026-02-27 05:40 UTC). The floor moves
+    # forward over time; anything earlier stalls rather than skipping forward,
+    # so do not lower this without re-probing (curl -s https://solana.hypersync.xyz/height).
+    start_block: 403000000  # serving floor, ~6 months; widened from 422,100,000 on 2026-08-14
     experimental:
       programs:
         - name: Earn
@@ -19,51 +20,31 @@ chains:
           instructions:
             - name: propagate_index
               discriminator: "0x93a11165dd56bada"
-              field_selection:
-                transaction_fields: [signatures]
         - name: Portal
           program_id: mzp1q2j5Hr1QuLC3KFBCAUz5aUckT6qyuZKZ3WJnMmY
           idl: idls/portal.json
           instructions:
             - name: send_message
               discriminator: "0x392822b2bd0a411a"
-              field_selection:
-                transaction_fields: [signatures]
-                token_balance_fields: true
             - name: receive_message
               discriminator: "0x26907fe11fe1ee19"
-              field_selection:
-                transaction_fields: [signatures]
-                token_balance_fields: true
         - name: WMExt
           program_id: wMXX1K1nca5W4pZr1piETe78gcAVVrEFi9f4g46uXko
           idl: idls/wm_ext.json
           instructions:
             - name: wrap
               discriminator: "0xb2280abde481ba8c"
-              field_selection:
-                transaction_fields: [signatures]
             - name: unwrap
               discriminator: "0x7eafc60ed445322c"
-              field_selection:
-                transaction_fields: [signatures]
             - name: claim_for
               discriminator: "0xf543612c3bdf9001"
-              field_selection:
-                transaction_fields: [signatures]
         - name: ExtSwap
           program_id: MSwapi3WhNKMUGm9YrxGhypgUEt7wYQH3ZgG32XoWzH
           idl: idls/ext_swap.json
           instructions:
             - name: swap
               discriminator: "0xf8c69e91e17587c8"
-              field_selection:
-                transaction_fields: [signatures]
             - name: wrap
               discriminator: "0xb2280abde481ba8c"
-              field_selection:
-                transaction_fields: [signatures]
             - name: unwrap
               discriminator: "0x7eafc60ed445322c"
-              field_selection:
-                transaction_fields: [signatures]

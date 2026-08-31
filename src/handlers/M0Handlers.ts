@@ -1,6 +1,11 @@
 /*
  * M^0 on Solana — Earn (yield index), Portal (bridge), wM extension, ext swaps.
  * IDLs vendored in ./idls (earn + portal fetched on-chain 2026-08-06).
+ *
+ * envio >= 3.9: payload fields are selected per handler via `fields` (no
+ * `field_selection` in config.yaml). Named accounts come from the IDL as
+ * `instruction.accounts.<name>.address`; the CPI path is `instruction.path`;
+ * SPL pre/post balances live on `instruction.transaction.accountActivities`.
  */
 import { indexer, type ProtocolStats } from "envio";
 
@@ -36,29 +41,35 @@ async function updateStats(
   context.ProtocolStats.set({ ...prev, ...patch(prev), lastSlot: Math.max(prev.lastSlot, slot) });
 }
 
-
+/** IDL u64/u128 args are decoded as decimal strings; accept bigint too. */
 const asBig = (v: unknown): bigint =>
   typeof v === "bigint" ? v : BigInt(String(v ?? 0));
 
-function ixId(txSig: string | undefined, address: readonly number[]): string {
-  return `${txSig ?? "unknown"}-${address.join(".")}`;
-}
+/** Deterministic per-instruction id: tx signature + CPI path. */
+const ixId = (txSig: string, path: readonly number[]): string =>
+  `${txSig}-${path.join(".")}`;
+
+/** Common selection: decoded args/accounts, CPI path, tx signature, block time. */
+const baseFields = {
+  instruction: ["args", "accounts", "path"],
+  transaction: ["signature"],
+  block: ["time"],
+} as const;
 
 // ---- Earn: yield index propagation (rebase history) ----
 
 indexer.onInstruction(
-  { program: "Earn", instruction: "propagate_index" },
+  { program: "Earn", instruction: "propagate_index", fields: baseFields },
   async ({ instruction, context }) => {
-    const txSig = instruction.transaction.signatures?.[0];
-    const args = instruction.params?.args as { index?: bigint } | undefined;
-    const index = asBig(args?.index ?? 0n);
+    const txSig = instruction.transaction.signature;
+    const index = asBig(instruction.args.index);
     context.IndexUpdate.set({
-      id: ixId(txSig, instruction.instructionAddress),
+      id: ixId(txSig, instruction.path),
       slot: instruction.block.slot,
       time: instruction.block.time,
       index,
       indexFloat: Number(index) / 1e12,
-      txSignature: txSig ?? "",
+      txSignature: txSig,
     });
     await updateStats(context, instruction.block.slot, (prev) => ({
       indexUpdates: prev.indexUpdates + 1,
@@ -69,103 +80,172 @@ indexer.onInstruction(
 
 // ---- Portal: bridge messages; $M delta from pre/post token balances ----
 
+/** Net $M minted/burned in the tx, summed over every $M token account it touched. */
 function mDelta(
-  tokenBalances:
-    | readonly { mint?: string; preAmount?: string; postAmount?: string }[]
-    | undefined,
+  activities: readonly {
+    token:
+      | { mint: string; preAmount: bigint | undefined; postAmount: bigint | undefined }
+      | undefined;
+  }[],
 ): bigint | undefined {
-  if (!tokenBalances) return undefined;
   let delta = 0n;
   let sawM = false;
-  for (const tb of tokenBalances) {
-    if (tb.mint !== M_MINT) continue;
+  for (const a of activities) {
+    if (a.token?.mint !== M_MINT) continue;
     sawM = true;
-    delta += BigInt(tb.postAmount ?? "0") - BigInt(tb.preAmount ?? "0");
+    delta += (a.token.postAmount ?? 0n) - (a.token.preAmount ?? 0n);
   }
   return sawM ? delta : undefined;
 }
 
-for (const [instructionName, direction] of [
-  ["receive_message", "in"],
-  ["send_message", "out"],
-] as const) {
+const portalFields = {
+  ...baseFields,
+  accountActivity: ["token.mint", "token.preAmount", "token.postAmount"],
+} as const;
+
+indexer.onInstruction(
+  { program: "Portal", instruction: "send_message", fields: portalFields },
+  async ({ instruction, context }) => {
+    const txSig = instruction.transaction.signature;
+    const delta = mDelta(instruction.transaction.accountActivities);
+    context.BridgeMessage.set({
+      id: ixId(txSig, instruction.path),
+      direction: "out",
+      slot: instruction.block.slot,
+      time: instruction.block.time,
+      destinationChainId: instruction.args.m0_destination_chain_id,
+      payloadType: instruction.args.payload_type,
+      mTokenDelta: delta,
+      txSignature: txSig,
+    });
+    await updateStats(context, instruction.block.slot, (prev) => ({
+      bridgeOut: prev.bridgeOut + 1,
+      netMBridged: asBig(prev.netMBridged) + (delta ?? 0n),
+    }));
+  },
+);
+
+indexer.onInstruction(
+  { program: "Portal", instruction: "receive_message", fields: portalFields },
+  async ({ instruction, context }) => {
+    const txSig = instruction.transaction.signature;
+    const delta = mDelta(instruction.transaction.accountActivities);
+    context.BridgeMessage.set({
+      id: ixId(txSig, instruction.path),
+      direction: "in",
+      slot: instruction.block.slot,
+      time: instruction.block.time,
+      destinationChainId: undefined, // inbound: VAA body carries the source, not decoded here
+      payloadType: undefined,
+      mTokenDelta: delta,
+      txSignature: txSig,
+    });
+    await updateStats(context, instruction.block.slot, (prev) => ({
+      bridgeIn: prev.bridgeIn + 1,
+      netMBridged: asBig(prev.netMBridged) + (delta ?? 0n),
+    }));
+  },
+);
+
+// ---- wM extension: wrap / unwrap / claims ----
+
+for (const kind of ["wrap", "unwrap"] as const) {
   indexer.onInstruction(
-    { program: "Portal", instruction: instructionName },
+    { program: "WMExt", instruction: kind, fields: baseFields },
     async ({ instruction, context }) => {
-      const txSig = instruction.transaction.signatures?.[0];
-      const args = instruction.params?.args as
-        | { m0_destination_chain_id?: number; payload_type?: number }
-        | undefined;
-      const delta = mDelta(
-        (instruction.transaction as unknown as {
-          tokenBalances?: readonly { mint?: string; preAmount?: string; postAmount?: string }[];
-        }).tokenBalances,
-      );
-      context.BridgeMessage.set({
-        id: ixId(txSig, instruction.instructionAddress),
-        direction,
+      const txSig = instruction.transaction.signature;
+      const amount = asBig(instruction.args.amount);
+      context.WMEvent.set({
+        id: ixId(txSig, instruction.path),
+        kind,
+        amount,
+        tokenAuthority: instruction.accounts.token_authority.address,
         slot: instruction.block.slot,
         time: instruction.block.time,
-        destinationChainId: args?.m0_destination_chain_id,
-        payloadType: args?.payload_type,
-        mTokenDelta: delta,
-        txSignature: txSig ?? "",
+        txSignature: txSig,
       });
       await updateStats(context, instruction.block.slot, (prev) => ({
-        bridgeIn: prev.bridgeIn + (direction === "in" ? 1 : 0),
-        bridgeOut: prev.bridgeOut + (direction === "out" ? 1 : 0),
-        netMBridged: asBig(prev.netMBridged) + (delta ?? 0n),
+        wrapVolume: asBig(prev.wrapVolume) + (kind === "wrap" ? amount : 0n),
+        unwrapVolume: asBig(prev.unwrapVolume) + (kind === "unwrap" ? amount : 0n),
       }));
     },
   );
 }
 
-// ---- wM extension: wrap / unwrap / claims ----
-
-for (const kind of ["wrap", "unwrap", "claim_for"] as const) {
-  indexer.onInstruction({ program: "WMExt", instruction: kind }, async ({ instruction, context }) => {
-    const txSig = instruction.transaction.signatures?.[0];
-    const args = instruction.params?.args as
-      | { amount?: bigint; snapshot_balance?: bigint }
-      | undefined;
-    const amount = asBig(args?.amount ?? args?.snapshot_balance ?? 0n);
-    const accounts: Readonly<Record<string, string>> = instruction.params?.accounts ?? {};
+indexer.onInstruction(
+  { program: "WMExt", instruction: "claim_for", fields: baseFields },
+  async ({ instruction, context }) => {
+    const txSig = instruction.transaction.signature;
     context.WMEvent.set({
-      id: ixId(txSig, instruction.instructionAddress),
-      kind,
-      amount,
-      tokenAuthority: accounts["token_authority"] ?? accounts["earn_authority"],
+      id: ixId(txSig, instruction.path),
+      kind: "claim_for",
+      amount: asBig(instruction.args.snapshot_balance),
+      tokenAuthority: instruction.accounts.earn_authority.address,
       slot: instruction.block.slot,
       time: instruction.block.time,
-      txSignature: txSig ?? "",
+      txSignature: txSig,
     });
-    await updateStats(context, instruction.block.slot, (prev) => ({
-      wrapVolume: asBig(prev.wrapVolume) + (kind === "wrap" ? asBig(amount) : 0n),
-      unwrapVolume: asBig(prev.unwrapVolume) + (kind === "unwrap" ? asBig(amount) : 0n),
-    }));
-  });
-}
+    await updateStats(context, instruction.block.slot, () => ({}));
+  },
+);
 
 // ---- Extension swap program ----
 
-for (const kind of ["swap", "wrap", "unwrap"] as const) {
-  indexer.onInstruction({ program: "ExtSwap", instruction: kind }, async ({ instruction, context }) => {
-    const txSig = instruction.transaction.signatures?.[0];
-    const args = instruction.params?.args as { amount?: bigint } | undefined;
-    const accounts: Readonly<Record<string, string>> = instruction.params?.accounts ?? {};
+indexer.onInstruction(
+  { program: "ExtSwap", instruction: "swap", fields: baseFields },
+  async ({ instruction, context }) => {
+    const txSig = instruction.transaction.signature;
     context.ExtSwapEvent.set({
-      id: ixId(txSig, instruction.instructionAddress),
-      kind,
-      amount: asBig(args?.amount ?? 0n),
-      fromMint: accounts["from_mint"] ?? accounts["m_mint"],
-      toMint: accounts["to_mint"],
-      signer: accounts["signer"],
+      id: ixId(txSig, instruction.path),
+      kind: "swap",
+      amount: asBig(instruction.args.amount),
+      fromMint: instruction.accounts.from_mint.address,
+      toMint: instruction.accounts.to_mint.address,
+      signer: instruction.accounts.signer.address,
       slot: instruction.block.slot,
       time: instruction.block.time,
-      txSignature: txSig ?? "",
+      txSignature: txSig,
     });
     await updateStats(context, instruction.block.slot, (prev) => ({
-      swapCount: prev.swapCount + (kind === "swap" ? 1 : 0),
+      swapCount: prev.swapCount + 1,
     }));
-  });
-}
+  },
+);
+
+indexer.onInstruction(
+  { program: "ExtSwap", instruction: "wrap", fields: baseFields },
+  async ({ instruction, context }) => {
+    const txSig = instruction.transaction.signature;
+    context.ExtSwapEvent.set({
+      id: ixId(txSig, instruction.path),
+      kind: "wrap",
+      amount: asBig(instruction.args.amount),
+      fromMint: instruction.accounts.m_mint.address,
+      toMint: instruction.accounts.to_mint.address,
+      signer: instruction.accounts.signer.address,
+      slot: instruction.block.slot,
+      time: instruction.block.time,
+      txSignature: txSig,
+    });
+    await updateStats(context, instruction.block.slot, () => ({}));
+  },
+);
+
+indexer.onInstruction(
+  { program: "ExtSwap", instruction: "unwrap", fields: baseFields },
+  async ({ instruction, context }) => {
+    const txSig = instruction.transaction.signature;
+    context.ExtSwapEvent.set({
+      id: ixId(txSig, instruction.path),
+      kind: "unwrap",
+      amount: asBig(instruction.args.amount),
+      fromMint: instruction.accounts.from_mint.address,
+      toMint: instruction.accounts.m_mint.address,
+      signer: instruction.accounts.signer.address,
+      slot: instruction.block.slot,
+      time: instruction.block.time,
+      txSignature: txSig,
+    });
+    await updateStats(context, instruction.block.slot, () => ({}));
+  },
+);
