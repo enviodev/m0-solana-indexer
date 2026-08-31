@@ -1,6 +1,6 @@
-# M^0 Solana indexer
+# M0 Solana indexer
 
-A HyperIndex indexer for [M^0](https://m0.org) on Solana mainnet, streamed via
+A HyperIndex indexer for [M0](https://www.m0.org) on Solana mainnet, streamed via
 HyperSync. It tracks:
 
 - **Earn** `propagate_index` — yield-index propagation from Ethereum (`IndexUpdate`,

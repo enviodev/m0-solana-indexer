@@ -1,10 +1,10 @@
 // M0 on Solana — live data console. Everything the page shows is declared here.
 import type { SiteConfig } from "@/lib/types";
 
-// The live pointer is the Vercel project env var NEXT_PUBLIC_GRAPHQL_ENDPOINT (every
-// indexer deployment mints a new URL, so a committed default rots). Set it here only for
-// a known-good deployment; empty renders the built-in sample data.
-const ENDPOINT = "";
+// The static production endpoint of enviodev/m0-solana-indexer on staging.envio.dev —
+// stable across redeploys, so it is safe to commit. NEXT_PUBLIC_GRAPHQL_ENDPOINT still
+// overrides at build time; empty both and the page renders built-in sample data.
+const ENDPOINT = "https://enviodev-65eb751.internal.hyperindex.xyz/v1/graphql";
 
 const M_MINT = "mzerojk9tg56ebsrEAhfkyc9VgKjTW2zDqp6C5mhjzH";
 const WM_MINT = "mzeroXDoBpRVhnEXBra27qzAMdxgpWVY3DzQW7xMVJp";
